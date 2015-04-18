@@ -18,13 +18,28 @@
 //make sure every write or read keeps populating that byte with what you need there
 
 #include "fmreceiver.h"
+#include <QDebug>
 #include <QCoreApplication>
 #include <iostream>
+#include <signal.h>
+#include <unistd.h>
+
+FMReceiver fmReceiver(0x10);
+
+void sig_handler(int signo)
+{
+    if (signo == SIGINT) {
+        qDebug() << "Caught sigint; Stopping the Si4703";
+        fmReceiver.stop();
+    }
+}
 
 int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
-    FMReceiver fmReceiver(0x10);
+
+    if (signal(SIGINT, sig_handler) == SIG_ERR)
+        qDebug() << "\ncan't catch SIGINT\n";
 
     fmReceiver.init();
     int val;

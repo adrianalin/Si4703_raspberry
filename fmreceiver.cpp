@@ -3,6 +3,49 @@
 #include <QDebug>
 #include "fmreceiver.h"
 
+#define SEEK_DOWN  0 //Direction used for seeking. Default is down
+#define SEEK_UP  1
+
+//Define the register names
+#define DEVICEID 0x00
+#define CHIPID  0x01
+#define POWERCFG  0x02
+#define CHANNEL  0x03
+#define SYSCONFIG1  0x04
+#define SYSCONFIG2  0x05
+#define STATUSRSSI  0x0A
+#define READCHAN  0x0B
+#define RDSA  0x0C
+#define RDSB  0x0D
+#define RDSC  0x0E
+#define RDSD  0x0F
+
+//Register 0x02 - POWERCFG
+#define SMUTE  15
+#define DMUTE  14
+#define SKMODE  10
+#define SEEKUP  9
+#define SEEK  8
+
+//Register 0x03 - CHANNEL
+#define TUNE  15
+
+//Register 0x04 - SYSCONFIG1
+#define RDS  12
+#define DE  11
+
+//Register 0x05 - SYSCONFIG2
+#define SPACE1  5
+#define SPACE0  4
+
+//Register 0x0A - STATUSRSSI
+#define RDSR  15
+#define STC  14
+#define SFBL  13
+#define AFCRL  12
+#define RDSS  11
+#define STEREO  8
+
 FMReceiver::FMReceiver(uint8_t addr):
     m_devAddr(addr)
 {
@@ -36,11 +79,11 @@ void FMReceiver::readRegisters()
     int i = 0;
     I2Cdev::readBytes(m_devAddr, 0, 32, initialReadings);
 
-    printf("initialReadings = ");
-    for (uint j = 0; j < 32; j++) {
-        printf("%x, ", initialReadings[j]);
-    }
-    printf("\n");
+    //    printf("initialReadings = ");
+    //    for (uint j = 0; j < 32; j++) {
+    //        printf("%x, ", initialReadings[j]);
+    //    }
+    //    printf("\n");
 
     // Remember, register 0x0A comes in first so we have to shuffle the array around a bit
     for (int x = 0x0A ; ; x++) { // Read in these 32 bytes
@@ -54,7 +97,7 @@ void FMReceiver::readRegisters()
             break; // We're done!
     }
 
-    printf("reg = ");
+    printf("Initial regs [00h -> 0Ff] = ");
     for (uint j = 0; j < 16; j++) {
         printf("%x, ", si4703_registers[j]);
     }
@@ -93,6 +136,7 @@ void FMReceiver::updateRegisters()
 
 void FMReceiver::setOsc()
 {
+    qDebug() << "\nSet Oscilator";
     readRegisters();
     // write x8100 to reg 7 to activate oscilator
     // Enable the oscillator, from AN230 page 12 (rev 0.9)
@@ -100,43 +144,65 @@ void FMReceiver::setOsc()
     updateRegisters();
 }
 
-void FMReceiver::turnOffMute()
+void FMReceiver::enableIC()
 {
+    qDebug() << "\nEnable IC";
     // write x4001 to reg 2 to turn off mute and activate IC
     //
-    uint8_t data[1] = {1}; // writes 1 to lower byte of reg 2
-    I2Cdev::writeBytes(m_devAddr, 64, sizeof(data), data); // writes 64 to upper byte of reg 2
+    readRegisters(); // Read the current register set
+    si4703_registers[POWERCFG] = 0x4001; //Enable the IC
+    updateRegisters(); //Update
+    readRegisters();
+
+    //    uint8_t data[1] = {1}; // writes 1 to lower byte of reg 2
+    //    I2Cdev::writeBytes(m_devAddr, 64, sizeof(data), data); // writes 64 to upper byte of reg 2
 }
 
 void FMReceiver::setVolume(const uint8_t value)
 {
-    // "set volume"
-    uint8_t data[7] = {1, 0, 0, 0, 0, 0, 13};
+    qDebug() << "\nSet volume to " << value;
     if (value > 15) {
-        qDebug() << "Volume must be between [0, 15]";
+        qDebug() << "Cannot set volume. Must be between [0, 15]";
         return;
     }
-    qDebug() << "Setting Volume value to " << value;
-    data[6] = value;
-    I2Cdev::writeBytes(m_devAddr, 64, sizeof(data), data);
+
+    readRegisters();
+    si4703_registers[SYSCONFIG2] &= 0xFFF0; // Clear volume bits
+    si4703_registers[SYSCONFIG2] |= value;
+    updateRegisters(); // Update
+    readRegisters();
 }
 
 void FMReceiver::goToChannel(const unsigned int value)
 {
-    qDebug() << "Setting channel to " << value;
+    qDebug() << "\nGo to channel " << value;
     // write channel reg 03h
     uint8_t newChannel = value;
     newChannel *= 10;
     newChannel -= 8750;
     newChannel /= 20;
 
-    uint8_t data[3] = {1,128, newChannel};
-    I2Cdev::writeBytes(m_devAddr, 64, sizeof(data), data);
+    // These steps come from AN230 page 20 rev 0.5
+    readRegisters();
+    si4703_registers[POWERCFG] = 0x4001; // fix this
+    si4703_registers[CHANNEL] &= 0xFE00; // Clear out the channel bits
+    si4703_registers[CHANNEL] |= newChannel; // Mask in the new channel
+    si4703_registers[CHANNEL] |= (1 << TUNE); // Set the TUNE bit to start
+    updateRegisters();
 
-    // clear channel tune bit
-    sleep(1);
-    data[1] = 0;
-    I2Cdev::writeBytes(m_devAddr, 64, sizeof(data), data);
+    // Poll to see if STC is set
+    while(1) {
+        sleep(1);
+        readRegisters();
+        if( (si4703_registers[STATUSRSSI] & (1 << STC)) != 0)
+            break; // Tuning complete!
+        qDebug() << "Tuning...";
+    }
+
+    readRegisters();
+    si4703_registers[POWERCFG] = 0x4001; // fix this
+    si4703_registers[CHANNEL] &= ~(1 << TUNE); // Clear the tune after a tune has completed
+    updateRegisters();
 }
 
 void FMReceiver::init()
@@ -145,10 +211,8 @@ void FMReceiver::init()
 
     sleep(2);
     setOsc();
-
-
     sleep(2);
-    turnOffMute();
+    enableIC();
     sleep(2);
     setVolume();
     sleep(2);
@@ -156,5 +220,16 @@ void FMReceiver::init()
     sleep(2);
 
     qDebug() << "end init";
+}
+
+void FMReceiver::stop()
+{
+    // Clear the DMUTE bit to enable mute.
+    // Set the ENABLE bit high and DISABLE bit high to set the powerdown state.
+    //
+    readRegisters();
+    si4703_registers[POWERCFG] = 0x0041;
+    updateRegisters();
+    exit(0);
 }
 

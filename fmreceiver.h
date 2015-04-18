@@ -10,6 +10,7 @@ public:
     FMReceiver(uint8_t addr);
     ~FMReceiver();
 
+    void stop();
     void init();
     void setVolume(const uint8_t value = 13);
     void goToChannel(const unsigned int value = 899);
@@ -18,7 +19,7 @@ private:
     // put SI4703 into 2 wire mode (I2C)
     void set2WireMode();
     void setOsc();
-    void turnOffMute();
+    void enableIC();
     //Read the entire register control set from 0x00 to 0x0F
     void readRegisters();
     void updateRegisters();
