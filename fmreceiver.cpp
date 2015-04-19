@@ -55,12 +55,74 @@
 FMReceiver::FMReceiver(uint8_t addr):
     m_devAddr(addr)
 {
-
+    start();
 }
 
 FMReceiver::~FMReceiver()
 {
+    qDebug() << "Destroying stuff";
+    stop();
+}
 
+void FMReceiver::start()
+{
+    set2WireMode();
+    initSI4703();
+    // init done; now play something
+    goToChannel();
+    setVolume();
+}
+
+void FMReceiver::stop()
+{
+    // Clear the DMUTE bit to enable mute.
+    // Set the ENABLE bit high and DISABLE bit high to set the powerdown state.
+    readRegisters();
+    si4703_registers[POWERCFG] = 0x0041;
+    updateRegisters();
+    exit(0);
+}
+
+void FMReceiver::set2WireMode()
+{
+    // GPIO23 on RPI -> RST on SI4703
+    // Set up GPIO 23 and set to output
+    system("echo \"23\" > /sys/class/gpio/export");
+    system("echo \"out\" > /sys/class/gpio/gpio23/direction");
+
+    // Write output
+    system("echo \"0\" > /sys/class/gpio/gpio23/value");
+    QTest::qSleep(100);
+    system("echo \"1\" > /sys/class/gpio/gpio23/value");
+    QTest::qSleep(100);
+}
+
+void FMReceiver::initSI4703()
+{
+    qDebug() << "\nInit IC";
+
+    readRegisters(); // Read the current register set
+    si4703_registers[0x07] = 0x8100; // Enable the oscillator
+    updateRegisters(); // Update
+
+    QTest::qSleep(500); // Wait for clock to settle - from AN230 page 9
+
+    readRegisters(); // Read the current register set
+    si4703_registers[POWERCFG] = 0x4001; // Enable the IC
+    si4703_registers[SYSCONFIG1] |= (1 << RDS); // Enable RDS
+
+#ifdef IN_EUROPE
+    si4703_registers[SYSCONFIG1] |= (1 << DE); // 50kHz Europe setup
+    si4703_registers[SYSCONFIG2] |= (1 << SPACE0); // 100kHz channel spacing for Europe
+#else
+    si4703_registers[SYSCONFIG2] &= ~(1 << SPACE1 | 1 << SPACE0) ; // Force 200kHz channel spacing for USA
+#endif
+
+    si4703_registers[SYSCONFIG2] &= 0xFFF0; // Clear volume bits
+    si4703_registers[SYSCONFIG2] |= 0x0001; // Set volume to lowest
+    updateRegisters(); // Update
+
+    QTest::qSleep(110); // Max powerup time, from datasheet page 13
 }
 
 // Reads the current channel from READCHAN
@@ -119,20 +181,6 @@ void FMReceiver::checkRDS()
     }
 }
 
-void FMReceiver::set2WireMode()
-{
-    // GPIO23 on RPI -> RST on SI4703
-    // Set up GPIO 23 and set to output
-    system("echo \"23\" > /sys/class/gpio/export");
-    system("echo \"out\" > /sys/class/gpio/gpio23/direction");
-
-    // Write output
-    system("echo \"0\" > /sys/class/gpio/gpio23/value");
-    QTest::qSleep(500);
-    system("echo \"1\" > /sys/class/gpio/gpio23/value");
-    QTest::qSleep(500);
-}
-
 void FMReceiver::readRegisters()
 {
     // Anytime you READ the regsters it writes the command byte to the first byte of the
@@ -185,35 +233,6 @@ void FMReceiver::updateRegisters()
     printf("\n");
 
     I2Cdev::writeBytes(m_devAddr, dataToSend[0], sizeof(dataToSend) - 1, &dataToSend[1]);
-}
-
-void FMReceiver::setOsc()
-{
-    qDebug() << "\nSet Oscilator";
-    readRegisters();
-    // write x8100 to reg 7 to activate oscilator
-    // Enable the oscillator, from AN230 page 12 (rev 0.9)
-    si4703_registers[0x07] = 0x8100;
-    updateRegisters();
-}
-
-void FMReceiver::enableIC()
-{
-    qDebug() << "\nEnable IC";
-    readRegisters(); // Read the current register set
-    si4703_registers[POWERCFG] = 0x4001; // Enable the IC
-    si4703_registers[SYSCONFIG1] |= (1 << RDS); // Enable RDS
-
-#ifdef IN_EUROPE
-    si4703_registers[SYSCONFIG1] |= (1 << DE); //50kHz Europe setup
-    si4703_registers[SYSCONFIG2] |= (1 << SPACE0); //100kHz channel spacing for Europe
-#else
-    si4703_registers[SYSCONFIG2] &= ~(1<<SPACE1 | 1<<SPACE0) ; //Force 200kHz channel spacing for USA
-#endif
-
-    si4703_registers[SYSCONFIG2] &= 0xFFF0; // Clear volume bits
-    si4703_registers[SYSCONFIG2] |= 0x0001; // Set volume to lowest
-    updateRegisters(); //Update
 }
 
 void FMReceiver::setVolume(const uint8_t value)
@@ -277,6 +296,7 @@ bool FMReceiver::seek(int seekDirection)
         return(FAIL);
     }
 
+    qDebug() << "Channel set to " << readChannel();
     return(SUCCESS);
 }
 
@@ -328,32 +348,5 @@ void FMReceiver::goToChannel(const unsigned int value)
     }
 
     qDebug() << "Station set to " << readChannel();
-}
-
-void FMReceiver::init()
-{
-    set2WireMode();
-
-    QTest::qSleep(500);
-    setOsc();
-    QTest::qSleep(500);
-    enableIC();
-    QTest::qSleep(500);
-    setVolume();
-    QTest::qSleep(500);
-    goToChannel();
-    qDebug() << "Selected channel " << readChannel();
-
-    qDebug() << "end init";
-}
-
-void FMReceiver::stop()
-{
-    // Clear the DMUTE bit to enable mute.
-    // Set the ENABLE bit high and DISABLE bit high to set the powerdown state.
-    readRegisters();
-    si4703_registers[POWERCFG] = 0x0041;
-    updateRegisters();
-    exit(0);
 }
 

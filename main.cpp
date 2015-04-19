@@ -41,7 +41,6 @@ int main(int argc, char *argv[])
     if (signal(SIGINT, sig_handler) == SIG_ERR)
         qDebug() << "\ncan't catch SIGINT\n";
 
-    fmReceiver.init();
     int val;
     while (1) {
         std::cout << "Seek: ";
