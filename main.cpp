@@ -44,9 +44,9 @@ int main(int argc, char *argv[])
     fmReceiver.init();
     int val;
     while (1) {
-        std::cout << "set volume: ";
+        std::cout << "Seek: ";
         std::cin >> val;
-        fmReceiver.setVolume(val);
+        fmReceiver.seek(val);
     }
 
     return a.exec();

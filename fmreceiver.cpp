@@ -4,6 +4,11 @@
 #include <QtTest/QTest>
 #include "fmreceiver.h"
 
+#define IN_EUROPE
+
+#define FAIL  0
+#define SUCCESS  1
+
 #define SEEK_DOWN  0 //Direction used for seeking. Default is down
 #define SEEK_UP  1
 
@@ -58,6 +63,27 @@ FMReceiver::~FMReceiver()
 
 }
 
+// Reads the current channel from READCHAN
+// Returns a number like 973 for 97.3MHz
+int FMReceiver::readChannel()
+{
+    readRegisters();
+    int channel = si4703_registers[READCHAN] & 0x03FF; // Mask out everything but the lower 10 bits
+
+#ifdef IN_EUROPE
+    //Freq(MHz) = 0.100(in Europe) * Channel + 87.5MHz
+    //X = 0.1 * Chan + 87.5
+    channel *= 1; //98 * 1 = 98 - I know this line is silly, but it makes the code look uniform
+#else
+    //Freq(MHz) = 0.200(in USA) * Channel + 87.5MHz
+    //X = 0.2 * Chan + 87.5
+    channel *= 2; //49 * 2 = 98
+#endif
+
+    channel += 875; //98 + 875 = 973
+    return(channel);
+}
+
 void FMReceiver::checkRDS()
 {
     qDebug() << "\nCheck RDS";
@@ -109,11 +135,14 @@ void FMReceiver::set2WireMode()
 
 void FMReceiver::readRegisters()
 {
+    // Anytime you READ the regsters it writes the command byte to the first byte of the
+    // SI4703 0x02 register. And then uses the list to write the 2nd bytes of register 0x02
+    // and continues until all the list is written!
     // Si4703 begins reading from register upper register of 0x0A and reads to 0x0F, then loops to 0x00.
     // We want to read the entire register set from 0x0A to 0x09 = 32 bytes.
     uint8_t initialReadings[32];
     int i = 0;
-    I2Cdev::readBytes(m_devAddr, 64, 32, initialReadings);
+    I2Cdev::readBytes(m_devAddr, si4703_registers[POWERCFG] >> 8, 32, initialReadings);
 
     // Remember, register 0x0A comes in first so we have to shuffle the array around a bit
     for (int x = 0x0A ; ; x++) { // Read in these 32 bytes
@@ -174,6 +203,14 @@ void FMReceiver::enableIC()
     readRegisters(); // Read the current register set
     si4703_registers[POWERCFG] = 0x4001; // Enable the IC
     si4703_registers[SYSCONFIG1] |= (1 << RDS); // Enable RDS
+
+#ifdef IN_EUROPE
+    si4703_registers[SYSCONFIG1] |= (1 << DE); //50kHz Europe setup
+    si4703_registers[SYSCONFIG2] |= (1 << SPACE0); //100kHz channel spacing for Europe
+#else
+    si4703_registers[SYSCONFIG2] &= ~(1<<SPACE1 | 1<<SPACE0) ; //Force 200kHz channel spacing for USA
+#endif
+
     si4703_registers[SYSCONFIG2] &= 0xFFF0; // Clear volume bits
     si4703_registers[SYSCONFIG2] |= 0x0001; // Set volume to lowest
     updateRegisters(); //Update
@@ -193,6 +230,56 @@ void FMReceiver::setVolume(const uint8_t value)
     updateRegisters(); // Update
 }
 
+// Seeks out the next available station
+// Returns the freq if it made it
+// Returns zero if failed
+bool FMReceiver::seek(int seekDirection)
+{
+    qDebug() << "\n Seek";
+    readRegisters();
+
+    //Set seek mode wrap bit
+    si4703_registers[POWERCFG] |= (1 << SKMODE); //Allow wrap
+    //    si4703_registers[POWERCFG] &= ~(1 << SKMODE); //Disallow wrap - if you disallow wrap, you may want to tune to 87.5 first
+
+    if (seekDirection == SEEK_DOWN)
+        si4703_registers[POWERCFG] &= ~(1 << SEEKUP); //Seek down is the default upon reset
+    else
+        si4703_registers[POWERCFG] |= 1 << SEEKUP; //Set the bit to seek up
+
+    si4703_registers[POWERCFG] |= (1 << SEEK); //Start seek
+
+    updateRegisters(); //Seeking will now start
+
+    //Poll to see if STC is set
+    while(1) {
+        readRegisters();
+        if ((si4703_registers[STATUSRSSI] & (1 << STC)) != 0)
+            break; //Tuning complete!
+    }
+    qDebug() << "Trying station: " << readChannel();
+
+    readRegisters();
+    int valueSFBL = si4703_registers[STATUSRSSI] & (1 << SFBL); //Store the value of SFBL
+    si4703_registers[POWERCFG] &= ~(1 << SEEK); //Clear the seek bit after seek has completed
+    updateRegisters();
+
+    //Wait for the si4703 to clear the STC as well
+    while(1) {
+        readRegisters();
+        if ((si4703_registers[STATUSRSSI] & (1 << STC)) == 0)
+            break; //Tuning complete!
+        qDebug() << "Waiting...";
+    }
+
+    if (valueSFBL) { //The bit was set indicating we hit a band limit or failed to find a station
+        qDebug() << "Seek limit hit"; //Hit limit of band during seek
+        return(FAIL);
+    }
+
+    return(SUCCESS);
+}
+
 // Given a channel, tune to it
 // Channel is in MHz, so 973 will tune to 97.3MHz
 // Note: gotoChannel will go to illegal channels (ie, greater than 110MHz)
@@ -202,10 +289,15 @@ void FMReceiver::goToChannel(const unsigned int value)
 {
     qDebug() << "\nGo to channel " << value;
     // write channel reg 03h
-    uint8_t newChannel = value;
+    int newChannel = value;
     newChannel *= 10;
     newChannel -= 8750;
-    newChannel /= 20;
+
+#ifdef IN_EUROPE
+    newChannel /= 10; //980 / 10 = 98
+#else
+    newChannel /= 20; //980 / 20 = 49
+#endif
 
     // These steps come from AN230 page 20 rev 0.5
     readRegisters();
@@ -234,6 +326,8 @@ void FMReceiver::goToChannel(const unsigned int value)
             break; //Tuning complete!
         qDebug() << "Waiting...";
     }
+
+    qDebug() << "Station set to " << readChannel();
 }
 
 void FMReceiver::init()
@@ -248,6 +342,7 @@ void FMReceiver::init()
     setVolume();
     QTest::qSleep(500);
     goToChannel();
+    qDebug() << "Selected channel " << readChannel();
 
     qDebug() << "end init";
 }
