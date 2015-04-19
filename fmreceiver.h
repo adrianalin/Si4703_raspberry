@@ -13,7 +13,7 @@ public:
     void stop();
     void start();
     void setVolume(const uint8_t value = 10);
-    void goToChannel(const unsigned int value = 899);
+    void goToChannel(const unsigned int value = 999);
     void checkRDS();
     bool seek(int seekDirection);
     int readChannel();
