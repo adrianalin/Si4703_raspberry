@@ -44,9 +44,9 @@ int main(int argc, char *argv[])
     fmReceiver.init();
     int val;
     while (1) {
-        std::cout << "Set channel: \n";
+        std::cout << "set volume: ";
         std::cin >> val;
-        fmReceiver.goToChannel(val);
+        fmReceiver.setVolume(val);
     }
 
     return a.exec();

@@ -14,6 +14,7 @@ public:
     void init();
     void setVolume(const uint8_t value = 13);
     void goToChannel(const unsigned int value = 899);
+    void checkRDS();
 
 private:
     // put SI4703 into 2 wire mode (I2C)
