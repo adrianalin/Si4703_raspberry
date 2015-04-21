@@ -4,7 +4,7 @@
 #
 #-------------------------------------------------
 
-QT       += core testlib
+QT       += core testlib network
 CONFIG += c++11
 QT       -= gui
 
@@ -17,8 +17,12 @@ TEMPLATE = app
 
 SOURCES += main.cpp \
     I2Cdev.cpp \
-    fmreceiver.cpp
+    fmreceiver.cpp \
+    server.cpp \
+    alarm.cpp
 
 HEADERS += \
     I2Cdev.h \
-    fmreceiver.h
+    fmreceiver.h \
+    server.h \
+    alarm.h

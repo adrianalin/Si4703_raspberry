@@ -3,20 +3,28 @@
 
 #include <stdint.h>
 #include <I2Cdev.h>
+#include <QObject>
 
-class FMReceiver
+class FMReceiver: public QObject
 {
+    Q_OBJECT
+
 public:
-    FMReceiver(uint8_t addr);
+    FMReceiver(QObject* parent = 0, uint8_t addr = 0x10);
     ~FMReceiver();
 
-    void stop();
-    void start();
-    void setVolume(const uint8_t value = 10);
     void goToChannel(const unsigned int value = 999);
     void checkRDS();
-    bool seek(int seekDirection);
     int readChannel();
+
+public slots:
+    void setVolume(const quint8 value = 10);
+    void stop();
+    void start();
+    bool seek(quint8 seekDirection);
+
+signals:
+    void frequencyChanged(int freq);
 
 private:
     // put SI4703 into 2 wire mode (I2C)
@@ -27,6 +35,8 @@ private:
     void updateRegisters();
 
 private:
+    int m_frequency;
+    bool m_started;
     uint8_t m_devAddr;
     uint16_t si4703_registers[16]; //There are 16 registers, each 16 bits large
 };

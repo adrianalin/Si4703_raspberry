@@ -52,8 +52,10 @@
 #define RDSS  11
 #define STEREO  8
 
-FMReceiver::FMReceiver(uint8_t addr):
-    m_devAddr(addr)
+FMReceiver::FMReceiver(QObject *parent, uint8_t addr):
+    QObject(parent),
+    m_devAddr(addr),
+    m_started(false)
 {
     start();
 }
@@ -66,6 +68,12 @@ FMReceiver::~FMReceiver()
 
 void FMReceiver::start()
 {
+    if (m_started) {
+        qDebug() << "Radio already running!";
+        return;
+    }
+    m_started = true;
+
     set2WireMode();
     initSI4703();
     // init done; now play something
@@ -75,12 +83,16 @@ void FMReceiver::start()
 
 void FMReceiver::stop()
 {
+    if (!m_started) {
+        qDebug() << "Radio already stopped!";
+        return;
+    }
+    m_started = false;
     // Clear the DMUTE bit to enable mute.
     // Set the ENABLE bit high and DISABLE bit high to set the powerdown state.
     readRegisters();
     si4703_registers[POWERCFG] = 0x0041;
     updateRegisters();
-    exit(0);
 }
 
 void FMReceiver::set2WireMode()
@@ -130,20 +142,26 @@ void FMReceiver::initSI4703()
 int FMReceiver::readChannel()
 {
     readRegisters();
-    int channel = si4703_registers[READCHAN] & 0x03FF; // Mask out everything but the lower 10 bits
+    int frequency = si4703_registers[READCHAN] & 0x03FF; // Mask out everything but the lower 10 bits
 
 #ifdef IN_EUROPE
     //Freq(MHz) = 0.100(in Europe) * Channel + 87.5MHz
     //X = 0.1 * Chan + 87.5
-    channel *= 1; //98 * 1 = 98 - I know this line is silly, but it makes the code look uniform
+    frequency *= 1; //98 * 1 = 98 - I know this line is silly, but it makes the code look uniform
 #else
     //Freq(MHz) = 0.200(in USA) * Channel + 87.5MHz
     //X = 0.2 * Chan + 87.5
     channel *= 2; //49 * 2 = 98
 #endif
 
-    channel += 875; //98 + 875 = 973
-    return(channel);
+    frequency += 875; //98 + 875 = 973
+
+    if (m_frequency != frequency) {
+        m_frequency = frequency;
+        emit frequencyChanged(m_frequency);
+    }
+
+    return(frequency);
 }
 
 void FMReceiver::checkRDS()
@@ -235,7 +253,7 @@ void FMReceiver::updateRegisters()
     I2Cdev::writeBytes(m_devAddr, dataToSend[0], sizeof(dataToSend) - 1, &dataToSend[1]);
 }
 
-void FMReceiver::setVolume(const uint8_t value)
+void FMReceiver::setVolume(const quint8 value)
 {
     qDebug() << "\nSet volume to " << value;
     if (value > 15) {
@@ -252,7 +270,7 @@ void FMReceiver::setVolume(const uint8_t value)
 // Seeks out the next available station
 // Returns the freq if it made it
 // Returns zero if failed
-bool FMReceiver::seek(int seekDirection)
+bool FMReceiver::seek(quint8 seekDirection)
 {
     qDebug() << "\n Seek";
     readRegisters();

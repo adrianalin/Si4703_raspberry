@@ -17,36 +17,41 @@
 // so after setting the first byte of 0x02 to what you want it to be you need to
 //make sure every write or read keeps populating that byte with what you need there
 
-#include "fmreceiver.h"
-#include <QDebug>
 #include <QCoreApplication>
-#include <iostream>
+#include <QObject>
 #include <signal.h>
 #include <unistd.h>
-
-FMReceiver fmReceiver(0x10);
+#include "server.h"
+#include "fmreceiver.h"
+#include "alarm.h"
 
 void sig_handler(int signo)
 {
     if (signo == SIGINT) {
         qDebug() << "Caught sigint; Stopping the Si4703";
-        fmReceiver.stop();
+        exit(0);
     }
 }
 
 int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
+    RadioServer rServer;
+    FMReceiver fmReceiver;
+    Alarm mAlarm;
+
+    QObject::connect(&rServer, SIGNAL(volumeChanged(quint8)), &fmReceiver, SLOT(setVolume(quint8)));
+    QObject::connect(&rServer, SIGNAL(started()), &fmReceiver, SLOT(start()));
+    QObject::connect(&rServer, SIGNAL(stopped()), &fmReceiver, SLOT(stop()));
+    QObject::connect(&rServer, SIGNAL(seek(quint8)), &fmReceiver, SLOT(seek(quint8)));
+
+    QObject::connect(&fmReceiver, SIGNAL(frequencyChanged(int)), &rServer, SLOT(onFrequencyChanged(int)));
+
+    QObject::connect(&rServer, SIGNAL(startAlarm(QDateTime)), &mAlarm, SLOT(start(QDateTime)));
+    QObject::connect(&mAlarm, SIGNAL(triggered()), &fmReceiver, SLOT(start()));
 
     if (signal(SIGINT, sig_handler) == SIG_ERR)
         qDebug() << "\ncan't catch SIGINT\n";
-
-    int val;
-    while (1) {
-        std::cout << "Seek: ";
-        std::cin >> val;
-        fmReceiver.seek(val);
-    }
 
     return a.exec();
 }
