@@ -10,8 +10,6 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->dateTimeEdit->setDateTime(QDateTime::currentDateTime());
 
     connect(ui->volumeSlider, &QSlider::valueChanged, this, &MainWindow::onVolumeSliderChanged);
-    connect(ui->startButton, &QPushButton::pressed, this, &MainWindow::onStartPressed);
-    connect(ui->stopButton, &QPushButton::pressed, this, &MainWindow::onStopPressed);
     connect(ui->alarmButton, &QPushButton::pressed, this, &MainWindow::onSetAlarm);
     connect(ui->seekDownButton, &QPushButton::pressed, this, &MainWindow::onSeekDown);
     connect(ui->seekUpButton, &QPushButton::pressed, this, &MainWindow::onSeekUp);
@@ -24,6 +22,7 @@ MainWindow::~MainWindow()
 {
     qDebug() << "Destroy obbbbbjjjject";
     saveToSettings();
+    onStopPressed();
     delete ui;
 }
 

@@ -41,7 +41,7 @@
     <item row="0" column="0">
      <widget class="QWidget" name="widget_2" native="true">
       <layout class="QGridLayout" name="gridLayout_2">
-       <item row="5" column="0">
+       <item row="2" column="0">
         <widget class="QWidget" name="widget_3" native="true">
          <layout class="QGridLayout" name="gridLayout_3">
           <item row="0" column="0">
@@ -58,20 +58,6 @@
         </widget>
        </item>
        <item row="1" column="0">
-        <widget class="QPushButton" name="startButton">
-         <property name="text">
-          <string>Start</string>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="0">
-        <widget class="QPushButton" name="stopButton">
-         <property name="text">
-          <string>Stop</string>
-         </property>
-        </widget>
-       </item>
-       <item row="4" column="0">
         <widget class="QWidget" name="widget_4" native="true">
          <layout class="QHBoxLayout" name="horizontalLayout">
           <item>
@@ -99,14 +85,14 @@
         </widget>
        </item>
        <item row="3" column="0">
-        <spacer name="horizontalSpacer">
+        <spacer name="verticalSpacer">
          <property name="orientation">
-          <enum>Qt::Horizontal</enum>
+          <enum>Qt::Vertical</enum>
          </property>
          <property name="sizeHint" stdset="0">
           <size>
-           <width>40</width>
-           <height>20</height>
+           <width>20</width>
+           <height>40</height>
           </size>
          </property>
         </spacer>
