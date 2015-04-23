@@ -20,6 +20,7 @@ signals:
     void started();
     void startAlarm(QDateTime targetDateTime);
     void seek(quint8 upDown);
+    void goToChannel(unsigned int frequency);
 
 private slots:
     void onReadyRead();

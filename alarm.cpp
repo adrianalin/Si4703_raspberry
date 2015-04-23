@@ -16,6 +16,11 @@ void Alarm::start(QDateTime targetDateTime)
 {
     const QDateTime currentDateTime = QDateTime::currentDateTime();
     const int msecs = currentDateTime.msecsTo(targetDateTime);
+
+    if (msecs < 0) {
+        qWarning() << "Cannot start negativ timer for alarm " << msecs;
+        return ;
+    }
     qDebug() << "currentDateTime = " << currentDateTime.toString();
     qDebug() << "Start alarm targetDateTime = " << targetDateTime.toString() << ", msecs = " << msecs;
     m_alarmTimer.start(msecs);

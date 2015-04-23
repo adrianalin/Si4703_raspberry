@@ -58,6 +58,9 @@ FMReceiver::FMReceiver(QObject *parent, uint8_t addr):
     m_started(false)
 {
     start();
+    // init done; now play something
+    goToChannel();
+    setVolume();
 }
 
 FMReceiver::~FMReceiver()
@@ -76,9 +79,6 @@ void FMReceiver::start()
 
     set2WireMode();
     initSI4703();
-    // init done; now play something
-    goToChannel();
-    setVolume();
 }
 
 void FMReceiver::stop()
@@ -325,6 +325,10 @@ bool FMReceiver::seek(quint8 seekDirection)
 // Actually, during testing the Si4703 seems to be internally limiting it at 87.5. Neat.
 void FMReceiver::goToChannel(const unsigned int value)
 {
+    if (value < 875 || value > 1080) {
+        qWarning() << "Outside of Europe frequency band [87.5 - 108MHz]";
+        return;
+    }
     qDebug() << "\nGo to channel " << value;
     // write channel reg 03h
     int newChannel = value;

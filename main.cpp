@@ -50,6 +50,8 @@ int main(int argc, char *argv[])
     QObject::connect(&rServer, SIGNAL(startAlarm(QDateTime)), &mAlarm, SLOT(start(QDateTime)));
     QObject::connect(&mAlarm, SIGNAL(triggered()), &fmReceiver, SLOT(start()));
 
+    QObject::connect(&rServer, SIGNAL(goToChannel(uint)), &fmReceiver, SLOT(goToChannel(uint)));
+
     if (signal(SIGINT, sig_handler) == SIG_ERR)
         qDebug() << "\ncan't catch SIGINT\n";
 

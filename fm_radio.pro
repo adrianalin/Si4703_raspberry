@@ -25,4 +25,5 @@ HEADERS += \
     I2Cdev.h \
     fmreceiver.h \
     server.h \
-    alarm.h
+    alarm.h \
+    commands.h

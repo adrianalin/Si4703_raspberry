@@ -13,11 +13,11 @@ public:
     FMReceiver(QObject* parent = 0, uint8_t addr = 0x10);
     ~FMReceiver();
 
-    void goToChannel(const unsigned int value = 999);
     void checkRDS();
     int readChannel();
 
 public slots:
+    void goToChannel(const unsigned int value = 999);
     void setVolume(const quint8 value = 10);
     void stop();
     void start();

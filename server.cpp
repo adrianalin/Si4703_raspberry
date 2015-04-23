@@ -1,4 +1,5 @@
 #include "server.h"
+#include "commands.h"
 
 #define MY_ADDRESS "10.0.0.1"
 #define PORT 1234
@@ -46,23 +47,28 @@ void RadioServer::onReadyRead()
 void RadioServer::processDatagram(QString datagram)
 {
     const QString command = datagram.left(datagram.indexOf('$'));
-    qDebug() << "got command " << command;
+    qDebug() << "\ngot command " << command;
 
-    if (command == "Volume") {
+    if (command == VOLUME_CMD) {
         const QString value = datagram.right(datagram.length() - datagram.indexOf('$') - 1);
         emit volumeChanged(value.toUInt());
-    } else if (command == "Stop") {
+    } else if (command == STOP_CMD) {
         emit stopped();
-    } else if (command == "Start") {
+    } else if (command == START_CMD) {
         emit started();
-    } else if (command == "Alarm") {
+    } else if (command == ALARM_CMD) {
         const QString value = datagram.right(datagram.length() - datagram.indexOf('$') - 1);
         const QDateTime targetDateTime = QDateTime::fromString(value);
         qDebug() << "Got time " << targetDateTime.toString();
         emit startAlarm(targetDateTime);
-    } else if (command == "Seek") {
+    } else if (command == SEEK_CMD) {
         const QString value = datagram.right(datagram.length() - datagram.indexOf('$') - 1);
         qDebug() << "value = " << value;
         emit seek(value.toInt());
+    } else if (command == CHANNEL_CMD) {
+        const QString value = datagram.right(datagram.length() - datagram.indexOf('$') - 1);
+        unsigned int frequency = value.toFloat() * 10;
+        qDebug() << "frequency = " << frequency;
+        emit goToChannel(frequency);
     }
 }
