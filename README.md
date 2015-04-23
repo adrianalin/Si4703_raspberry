@@ -1,5 +1,15 @@
 # Si4703_raspberry
 
+There are 2 branches:
+
+* master - this is just the Si4073 configuration code;
+
+* UDPServer_radio_controller - this branch consists of 2 Qt projects:
+	- 1 the server application wraped around the Si1073 module to allow
+	remote control;
+	- 2 the client application used to connect to the server and control
+	the fm receiver;
+
 This is a simple application just for setting up (with i2c) the Si4703 fm 
 receiver module using the Raspberry Pi. The only dependency is the 
 I2Cdev.h and I2Cdev.cpp needed for i2c communication. I used qmake and Qt to 
@@ -20,9 +30,9 @@ http://www.sparkfun.com/datasheets/BreakoutBoards/Si4703_Example.pde
 
 * Raspberry Pi to Si4703 connections I used:
 
-Rpi               Si4703
-3V3-------------->3.3V
-GND-------------->GND
-SDA-------------->SDIO
-SCL-------------->SCLK
-GPIO23----------->RST
+- Rpi--------------Si4703
+- 3V3-------------->3.3V
+- GND-------------->GND
+- SDA-------------->SDIO
+- SCL-------------->SCLK
+- GPIO23----------->RST
