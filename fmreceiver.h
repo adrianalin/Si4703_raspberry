@@ -22,6 +22,7 @@ public slots:
     void stop();
     void start();
     bool seek(quint8 seekDirection);
+    void startAlarm();
 
 signals:
     void frequencyChanged(int freq);
@@ -36,6 +37,7 @@ private:
 
 private:
     int m_frequency;
+    quint8 m_volume;
     bool m_started;
     uint8_t m_devAddr;
     uint16_t si4703_registers[16]; //There are 16 registers, each 16 bits large

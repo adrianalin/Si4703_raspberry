@@ -69,6 +69,20 @@ FMReceiver::~FMReceiver()
     stop();
 }
 
+void FMReceiver::startAlarm()
+{
+    if (m_started) {
+        qDebug() << "Radio already running!";
+        return ;
+    }
+
+    // start the fm receiver
+    start();
+    // now play last radio station, with last volume  setup
+    setVolume(m_volume);
+    goToChannel(m_frequency);
+}
+
 void FMReceiver::start()
 {
     if (m_started) {
@@ -256,6 +270,7 @@ void FMReceiver::updateRegisters()
 void FMReceiver::setVolume(const quint8 value)
 {
     qDebug() << "\nSet volume to " << value;
+    m_volume = value;
     if (value > 15) {
         qDebug() << "Cannot set volume. Must be between [0, 15]";
         return;
@@ -369,6 +384,6 @@ void FMReceiver::goToChannel(const unsigned int value)
         qDebug() << "Waiting...";
     }
 
-    qDebug() << "Station set to " << readChannel();
+    qDebug() << "Channel set to " << readChannel();
 }
 

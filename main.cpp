@@ -44,13 +44,12 @@ int main(int argc, char *argv[])
     QObject::connect(&rServer, SIGNAL(started()), &fmReceiver, SLOT(start()));
     QObject::connect(&rServer, SIGNAL(stopped()), &fmReceiver, SLOT(stop()));
     QObject::connect(&rServer, SIGNAL(seek(quint8)), &fmReceiver, SLOT(seek(quint8)));
+    QObject::connect(&rServer, SIGNAL(startAlarm(QDateTime)), &mAlarm, SLOT(start(QDateTime)));
+    QObject::connect(&rServer, SIGNAL(goToChannel(uint)), &fmReceiver, SLOT(goToChannel(uint)));
 
     QObject::connect(&fmReceiver, SIGNAL(frequencyChanged(int)), &rServer, SLOT(onFrequencyChanged(int)));
 
-    QObject::connect(&rServer, SIGNAL(startAlarm(QDateTime)), &mAlarm, SLOT(start(QDateTime)));
-    QObject::connect(&mAlarm, SIGNAL(triggered()), &fmReceiver, SLOT(start()));
-
-    QObject::connect(&rServer, SIGNAL(goToChannel(uint)), &fmReceiver, SLOT(goToChannel(uint)));
+    QObject::connect(&mAlarm, SIGNAL(triggered()), &fmReceiver, SLOT(startAlarm()));
 
     if (signal(SIGINT, sig_handler) == SIG_ERR)
         qDebug() << "\ncan't catch SIGINT\n";
