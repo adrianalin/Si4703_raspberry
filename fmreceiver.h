@@ -41,6 +41,8 @@ private:
     bool m_started;
     uint8_t m_devAddr;
     uint16_t si4703_registers[16]; //There are 16 registers, each 16 bits large
+    char m_decodedRadioStation[16];
+    char m_decodedSong[16];
 };
 
 #endif // FMRECEIVER_H
