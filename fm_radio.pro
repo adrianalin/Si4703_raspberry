@@ -19,11 +19,16 @@ SOURCES += main.cpp \
     I2Cdev.cpp \
     fmreceiver.cpp \
     server.cpp \
-    alarm.cpp
+    alarm.cpp \
+    shadowregistershandling.cpp \
+    rdsinfothread.cpp
 
 HEADERS += \
     I2Cdev.h \
     fmreceiver.h \
     server.h \
     alarm.h \
-    commands.h
+    commands.h \
+    shadowregistershandling.h \
+    registers.h \
+    rdsinfothread.h

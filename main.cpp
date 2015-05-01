@@ -29,7 +29,7 @@ void sig_handler(int signo)
 {
     if (signo == SIGINT) {
         qDebug() << "Caught sigint; Stopping the Si4703";
-        exit(0);
+        QCoreApplication::quit();
     }
 }
 
