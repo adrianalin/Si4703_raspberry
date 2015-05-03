@@ -36,8 +36,8 @@ void RDSInfoThread::setRadioStation(char *name)
     if (i < 5)
         return ;
     i = 0;
-    QString radioInfo = QString::fromUtf8(name);
-    if (m_radioInfo == name)
+    const QString radioInfo = QString::fromUtf8(name).simplified();
+    if (m_radioInfo == radioInfo)
         return;
     m_radioInfo = radioInfo;
     emit newRadioInfo(m_radioInfo);
@@ -47,12 +47,14 @@ void RDSInfoThread::setRadioStation(char *name)
 void RDSInfoThread::setSongInfo(char *name)
 {
     static QString lastSongInfo;
-    const QString string = QString::fromUtf8(name);
+    const QString string = QString::fromUtf8(name).simplified();
     if (string.length() > 0)
         m_songInfo.append(string);
+
     if (m_songInfo.length() > 25) {
-        if (lastSongInfo != m_songInfo)
-            emit newSongInfo(m_songInfo);
+        if (lastSongInfo == m_songInfo)
+            return;
+        emit newSongInfo(m_songInfo);
         qDebug() << "Song info = " << m_songInfo;
         lastSongInfo = m_songInfo;
         m_songInfo.clear();
