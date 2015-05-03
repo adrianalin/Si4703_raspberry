@@ -16,6 +16,8 @@ public:
     ~RDSInfoThread();
 
     void stop(bool stop);
+    void setRadioStation(char* name);
+    void setSong(char* name);
 
 public slots:
     void process();
@@ -23,10 +25,13 @@ public slots:
 signals:
     void finished();
 
+
 private:
     uint16_t* si4703_registers;
-    char m_decodedRadioStation[20];
-    char m_decodedSong[20];
+    QString m_decodedRadioStation;
+    QString m_decodedSong;
+    char decodedRadioStation[20];
+    char decodedSong[20];
     ShadowRegistersHandling* m_handler;
     bool m_stop;
 };

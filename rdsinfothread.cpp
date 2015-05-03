@@ -23,6 +23,31 @@ void RDSInfoThread::stop(bool stop)
     m_stop = stop;
 }
 
+void RDSInfoThread::setRadioStation(char *name)
+{
+    static quint8 i = 0;
+    if (i == 5) {
+        i = 0;
+        QString string = QString::fromUtf8(name);
+        m_decodedRadioStation = string;
+        m_decodedRadioStation.clear();
+    }
+    i++;
+}
+
+void RDSInfoThread::setSong(char *name)
+{
+    static quint8 i = 0;
+    QString string = QString::fromUtf8(name);
+    if (string.length() > 0)
+        m_decodedSong.append(string);
+    if (m_decodedSong.length() > 25) {
+        qDebug() << m_decodedSong << endl;
+        m_decodedSong.clear();
+    }
+    i++;
+}
+
 void RDSInfoThread::process()
 {
     qDebug() << "\nCheck RDS";
@@ -39,22 +64,22 @@ void RDSInfoThread::process()
             if (grptype == TYP0AGRP) {
                 const int index = si4703_registers[RDSB] & 0x03;
                 if (index == 0) {
-                    qDebug() << "Decoded radio station = " << m_decodedRadioStation;
-                    memset(m_decodedRadioStation, 0, sizeof(m_decodedRadioStation));
+                    setRadioStation(decodedRadioStation);
+                    memset(decodedRadioStation, 0, sizeof(decodedRadioStation));
                 }
-                m_decodedRadioStation[index * 2] = Dh;
-                m_decodedRadioStation[index * 2 + 1] = Dl;
+                decodedRadioStation[index * 2] = Dh;
+                decodedRadioStation[index * 2 + 1] = Dl;
             } else if (grptype == TYP2AGRP) {
                 const int index = 4 * si4703_registers[RDSB] & 0x000F;
                 int ix = 0;
                 if (index == 0) {
-                    qDebug() << "Decoded music = " << m_decodedSong;
-                    memset(m_decodedSong, 0, sizeof(m_decodedSong));
+                    setSong(decodedSong);
+                    memset(decodedSong, 0, sizeof(decodedSong));
                 }
-                m_decodedSong[index + ix++] = Ch;
-                m_decodedSong[index + ix++] = Cl;
-                m_decodedSong[index + ix++] = Dh;
-                m_decodedSong[index + ix++] = Dl;
+                decodedSong[index + ix++] = Ch;
+                decodedSong[index + ix++] = Cl;
+                decodedSong[index + ix++] = Dh;
+                decodedSong[index + ix++] = Dl;
             }
 
             QTest::qSleep(40);

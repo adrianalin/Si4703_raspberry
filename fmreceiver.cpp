@@ -56,7 +56,6 @@ void FMReceiver::start()
     m_thread = new QThread;
     m_RDSWorker = new RDSInfoThread(&m_handler, si4703_registers);
     m_RDSWorker->moveToThread(m_thread);
-    connect(m_RDSWorker, SIGNAL(errorString(QString)), this, SLOT(errorString(QString)));
     connect(m_thread, SIGNAL(started()), m_RDSWorker, SLOT(process()));
     connect(m_RDSWorker, SIGNAL(finished()), m_thread, SLOT(quit()));
     connect(m_RDSWorker, SIGNAL(finished()), m_RDSWorker, SLOT(deleteLater()));
