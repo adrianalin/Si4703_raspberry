@@ -13,7 +13,10 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->alarmButton, &QPushButton::pressed, this, &MainWindow::onSetAlarm);
     connect(ui->seekDownButton, &QPushButton::pressed, this, &MainWindow::onSeekDown);
     connect(ui->seekUpButton, &QPushButton::pressed, this, &MainWindow::onSeekUp);
+
     connect(&m_UDPclient, &UDPClient::newFrequency, this, &MainWindow::onFrequecyChanged);
+    connect(&m_UDPclient, &UDPClient::newSongInfo, this, &MainWindow::onSongInfoChanged);
+    connect(&m_UDPclient, &UDPClient::newRadioInfo, this, &MainWindow::onRadioInfoChanged);
 
     loadFromSettings();
 }
@@ -99,4 +102,14 @@ void MainWindow::onSeekUp()
 void MainWindow::onFrequecyChanged(float frequency)
 {
     ui->frequencyLineEdit->setText(QString::number(frequency));
+}
+
+void MainWindow::onSongInfoChanged(QString name)
+{
+    ui->songInfoLabel->setText(name);
+}
+
+void MainWindow::onRadioInfoChanged(QString name)
+{
+    ui->radioInfoLabel->setText(name);
 }

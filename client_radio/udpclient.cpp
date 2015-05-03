@@ -34,19 +34,27 @@ void UDPClient::onReadyRead()
 void UDPClient::processDatagram(QString datagram)
 {
     const QString command = datagram.left(datagram.indexOf('$'));
-    qDebug() << "got command " << command;
+    qDebug() << "\ngot command " << command;
 
     if (command == FREQUENCY_RESP) {
         const QString value = datagram.right(datagram.length() - datagram.indexOf('$') - 1);
         float frequency = value.toFloat() / 10;
         emit newFrequency(frequency);
+    } else if (command == SONG_RESP) {
+        const QString value = datagram.right(datagram.length() - datagram.indexOf('$') - 1);
+        qDebug() << "value = " << value;
+        emit newSongInfo(value);
+    } else if (command == RADIO_RESP) {
+        const QString value = datagram.right(datagram.length() - datagram.indexOf('$') - 1);
+        qDebug() << "value = " << value;
+        emit newRadioInfo(value);
     }
 }
 
 void UDPClient::sendCommand(QByteArray dataToSend)
 {
     const QHostAddress serverAddress(SERVER_ADDRESS);
-    qDebug() << "Command to send: " << dataToSend;
+    qDebug() << "\nCommand to send: " << dataToSend;
     m_clientUDPSocket.writeDatagram(dataToSend, serverAddress, SERVER_PORT);
 }
 

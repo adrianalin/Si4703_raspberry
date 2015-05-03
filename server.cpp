@@ -25,6 +25,18 @@ void RadioServer::onFrequencyChanged(int frequency)
     sendCommand(command.toLatin1());
 }
 
+void RadioServer::onSongInfo(QString name)
+{
+    const QString command = SONG_RESP + QString("$") + name;
+    sendCommand(command.toLatin1());
+}
+
+void RadioServer::onRadioInfo(QString name)
+{
+    const QString command = RADIO_RESP + QString("$") + name;
+    sendCommand(command.toLatin1());
+}
+
 void RadioServer::sendCommand(QByteArray dataToSend)
 {
     qDebug() << "Command to send: " << dataToSend;

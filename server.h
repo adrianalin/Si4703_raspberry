@@ -25,6 +25,8 @@ signals:
 private slots:
     void onReadyRead();
     void onFrequencyChanged(int frequency);
+    void onSongInfo(QString name);
+    void onRadioInfo(QString name);
 
 private:
     void sendCommand(QByteArray dataToSend);

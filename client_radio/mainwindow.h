@@ -24,8 +24,11 @@ private slots:
     void onSetAlarm();
     void onSeekUp();
     void onSeekDown();
-    void onFrequecyChanged(float frequency);
     void onGoToFrequency(float frequency);
+
+    void onFrequecyChanged(float frequency);
+    void onSongInfoChanged(QString name);
+    void onRadioInfoChanged(QString name);
 
 private:
     void loadFromSettings();

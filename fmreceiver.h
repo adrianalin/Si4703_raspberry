@@ -18,17 +18,19 @@ public slots:
     void setVolume(const quint8 value = 10);
     void stop();
     void start();
-    bool seek(quint8 seekDirection);
+    void seek(quint8 seekDirection);
     void startAlarm();
 
 signals:
     void frequencyChanged(int freq);
+    void newSongInfo(QString name);
+    void newRadioInfo(QString name);
 
 private:
     // put SI4703 into 2 wire mode (I2C)
     void set2WireMode();
     void initSI4703();
-    int readChannel();
+    int readChannelFrequency();
 
 private:
     int m_frequency;

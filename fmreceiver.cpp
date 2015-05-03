@@ -15,12 +15,28 @@ FMReceiver::FMReceiver(QObject *parent):
     // init done; now play something
     goToChannel();
     setVolume();
+
+    // si4703 initialized, start the RDS thread to get play station info
+    m_thread = new QThread;
+    m_RDSWorker = new RDSInfoThread(&m_handler, si4703_registers);
+    m_RDSWorker->moveToThread(m_thread);
+    connect(m_thread, SIGNAL(started()), m_RDSWorker, SLOT(process()));
+    connect(m_RDSWorker, SIGNAL(finished()), m_thread, SLOT(quit()));
+    connect(m_RDSWorker, SIGNAL(finished()), m_RDSWorker, SLOT(deleteLater()));
+    connect(m_thread, SIGNAL(finished()), m_thread, SLOT(deleteLater()));
+    m_thread->start();
+
+    connect(m_RDSWorker, SIGNAL(newSongInfo(QString)), this, SIGNAL(newSongInfo(QString)));
+    connect(m_RDSWorker, SIGNAL(newRadioInfo(QString)), this, SIGNAL(newRadioInfo(QString)));
 }
 
 FMReceiver::~FMReceiver()
 {
     qDebug() << "Destroying fmReceiver";
     stop();
+
+    // stop the RDS thread
+    m_RDSWorker->stop(true);
     if (m_thread)
         m_thread->wait(1000);
 }
@@ -51,16 +67,6 @@ void FMReceiver::start()
 
     set2WireMode();
     initSI4703();
-
-    // si4703 initialized, start the RDS thread to get play station info
-    m_thread = new QThread;
-    m_RDSWorker = new RDSInfoThread(&m_handler, si4703_registers);
-    m_RDSWorker->moveToThread(m_thread);
-    connect(m_thread, SIGNAL(started()), m_RDSWorker, SLOT(process()));
-    connect(m_RDSWorker, SIGNAL(finished()), m_thread, SLOT(quit()));
-    connect(m_RDSWorker, SIGNAL(finished()), m_RDSWorker, SLOT(deleteLater()));
-    connect(m_thread, SIGNAL(finished()), m_thread, SLOT(deleteLater()));
-    m_thread->start();
 }
 
 void FMReceiver::stop()
@@ -71,14 +77,13 @@ void FMReceiver::stop()
         return;
     }
     m_started = false;
+
     // Clear the DMUTE bit to enable mute.
     // Set the ENABLE bit high and DISABLE bit high to set the powerdown state.
     m_handler.readRegisters(si4703_registers);
     si4703_registers[POWERCFG] = 0x0041;
     m_handler.updateRegisters(si4703_registers);
-
-    // stop the RDS thread
-    m_RDSWorker->stop(true);
+    m_RDSWorker->pauseReadingRDSInfo(true);
 }
 
 void FMReceiver::set2WireMode()
@@ -126,7 +131,7 @@ void FMReceiver::initSI4703()
 
 // Reads the current channel from READCHAN
 // Returns a number like 973 for 97.3MHz
-int FMReceiver::readChannel()
+int FMReceiver::readChannelFrequency()
 {
     m_handler.readRegisters(si4703_registers);
     int frequency = si4703_registers[READCHAN] & 0x03FF; // Mask out everything but the lower 10 bits
@@ -169,52 +174,50 @@ void FMReceiver::setVolume(const quint8 value)
 // Seeks out the next available station
 // Returns the freq if it made it
 // Returns zero if failed
-bool FMReceiver::seek(quint8 seekDirection)
+void FMReceiver::seek(quint8 seekDirection)
 {
-    qDebug() << "\n Seek " << seekDirection;
+    qDebug() << "\nSeek " << seekDirection;
+    m_RDSWorker->pauseReadingRDSInfo(true);             // no need to read RDS info when seeking
+
     m_handler.readRegisters(si4703_registers);
-
-    //Set seek mode wrap bit
-    si4703_registers[POWERCFG] |= (1 << SKMODE); //Allow wrap
-//    si4703_registers[POWERCFG] &= ~(1 << SKMODE); //Disallow wrap - if you disallow wrap, you may want to tune to 87.5 first
-
+    si4703_registers[POWERCFG] |= (1 << SKMODE);        // Allow wrap
+    //    si4703_registers[POWERCFG] &= ~(1 << SKMODE); // Disallow wrap - if you disallow wrap, you may want to tune to 87.5 first
     if (seekDirection == SEEK_DOWN)
-        si4703_registers[POWERCFG] &= ~(1 << SEEKUP); //Seek down is the default upon reset
+        si4703_registers[POWERCFG] &= ~(1 << SEEKUP);   // Seek down is the default upon reset
     else
-        si4703_registers[POWERCFG] |= 1 << SEEKUP; //Set the bit to seek up
+        si4703_registers[POWERCFG] |= 1 << SEEKUP;      // Set the bit to seek up
+    si4703_registers[POWERCFG] |= (1 << SEEK);          // Start seek
+    m_handler.updateRegisters(si4703_registers);        // Seeking will now start
 
-    si4703_registers[POWERCFG] |= (1 << SEEK); //Start seek
-
-    m_handler.updateRegisters(si4703_registers); //Seeking will now start
-
-    //Poll to see if STC is set
-    while (1) {
+    for (int i = 0; i < 500; i++)  {                    // Poll to see if STC is set
+        QTest::qSleep(2);
         m_handler.readRegisters(si4703_registers);
         if ((si4703_registers[STATUSRSSI] & (1 << STC)) != 0)
-            break; //Tuning complete!
+            break; // Tuning complete!
+        qDebug() << "Seeking...";
     }
-    qDebug() << "Trying station: " << readChannel();
+    qDebug() << "Trying station: " << readChannelFrequency();
 
     m_handler.readRegisters(si4703_registers);
-    int valueSFBL = si4703_registers[STATUSRSSI] & (1 << SFBL); //Store the value of SFBL
-    si4703_registers[POWERCFG] &= ~(1 << SEEK); //Clear the seek bit after seek has completed
+    const int valueSFBL = si4703_registers[STATUSRSSI] & (1 << SFBL); // Store the value of SFBL
+    si4703_registers[POWERCFG] &= ~(1 << SEEK);         // Clear the seek bit after seek has completed
     m_handler.updateRegisters(si4703_registers);
 
-    //Wait for the si4703 to clear the STC as well
-    for (int i = 0; i < 200; i++) {
+    for (int i = 0; i < 500; i++)  {                    // Wait for the si4703 to clear the STC as well
+        QTest::qSleep(2);
         m_handler.readRegisters(si4703_registers);
         if ((si4703_registers[STATUSRSSI] & (1 << STC)) == 0)
-            break; //Tuning complete!
-        qDebug() << "Waiting...";
+            break;                                      //Tuning complete!
+        qDebug() << "Waiting STC...";
     }
 
-    if (valueSFBL) { //The bit was set indicating we hit a band limit or failed to find a station
+    // The bit was set indicating we hit a band limit or failed to find a station
+    if (valueSFBL) {
         qDebug() << "Seek limit hit"; //Hit limit of band during seek
-        return(FAIL);
     }
 
-    qDebug() << "Channel set to " << readChannel();
-    return(SUCCESS);
+    m_RDSWorker->pauseReadingRDSInfo(false);
+    qDebug() << "Channel set to " << readChannelFrequency();
 }
 
 // Given a channel, tune to it
@@ -224,16 +227,16 @@ bool FMReceiver::seek(quint8 seekDirection)
 // Actually, during testing the Si4703 seems to be internally limiting it at 87.5. Neat.
 void FMReceiver::goToChannel(const unsigned int value)
 {
+    qDebug() << "\nGo to channel " << value;
     if (value < 875 || value > 1080) {
         qWarning() << "Frequency " << value << " outside of band [87.5 - 108MHz]";
         return;
     }
-    qDebug() << "\nGo to channel " << value;
-    // write channel reg 03h
+    m_RDSWorker->pauseReadingRDSInfo(true);
+
     int newChannel = value;
     newChannel *= 10;
     newChannel -= 8750;
-
 #ifdef IN_EUROPE
     newChannel /= 10; //980 / 10 = 98
 #else
@@ -242,31 +245,31 @@ void FMReceiver::goToChannel(const unsigned int value)
 
     // These steps come from AN230 page 20 rev 0.5
     m_handler.readRegisters(si4703_registers);
-    si4703_registers[CHANNEL] &= 0xFE00; // Clear out the channel bits
-    si4703_registers[CHANNEL] |= newChannel; // Mask in the new channel
-    si4703_registers[CHANNEL] |= (1 << TUNE); // Set the TUNE bit to start
+    si4703_registers[CHANNEL] &= 0xFE00;            // Clear out the channel bits
+    si4703_registers[CHANNEL] |= newChannel;        // Mask in the new channel
+    si4703_registers[CHANNEL] |= (1 << TUNE);       // Set the TUNE bit to start
     m_handler.updateRegisters(si4703_registers);
 
-    // Poll to see if STC is set
-    while (1)  {
-        QTest::qSleep(500);
+    for (int i = 0; i < 200; i++)  {                // Poll to see if STC is set
+        QTest::qSleep(2);
         m_handler.readRegisters(si4703_registers);
         if ((si4703_registers[STATUSRSSI] & (1 << STC)) != 0)
-            break; // Tuning complete!
+            break;                                  // Tuning complete!
         qDebug() << "Tuning...";
     }
 
     m_handler.readRegisters(si4703_registers);
-    si4703_registers[CHANNEL] &= ~(1 << TUNE); // Clear the tune after a tune has completed
+    si4703_registers[CHANNEL] &= ~(1 << TUNE);      // Clear the tune after a tune has completed
     m_handler.updateRegisters(si4703_registers);
 
-    // Wait for the si4703 to clear the STC as well
-    for (int i = 0; i < 200; i++)  {
+    for (int i = 0; i < 200; i++)  {                // Wait for the si4703 to clear the STC as well
+        QTest::qSleep(2);
         m_handler.readRegisters(si4703_registers);
         if ((si4703_registers[STATUSRSSI] & (1 << STC)) == 0)
             break; //Tuning complete!
         qDebug() << "Waiting...";
     }
 
-    qDebug() << "Channel set to " << readChannel();
+    m_RDSWorker->pauseReadingRDSInfo(false);
+    qDebug() << "Channel set to " << readChannelFrequency();
 }

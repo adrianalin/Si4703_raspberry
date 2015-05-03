@@ -17,6 +17,8 @@ public:
 
 signals:
     void newFrequency(float frequency);
+    void newSongInfo(QString name);
+    void newRadioInfo(QString name);
 
 private slots:
     void onReadyRead();

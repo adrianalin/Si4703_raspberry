@@ -5,9 +5,6 @@
 
 #define IN_EUROPE
 
-#define FAIL  0
-#define SUCCESS  1
-
 #define SEEK_DOWN  0 //Direction used for seeking. Default is down
 #define SEEK_UP  1
 

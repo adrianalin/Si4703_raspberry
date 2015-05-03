@@ -48,6 +48,8 @@ int main(int argc, char *argv[])
     QObject::connect(&rServer, SIGNAL(goToChannel(uint)), &fmReceiver, SLOT(goToChannel(uint)));
 
     QObject::connect(&fmReceiver, SIGNAL(frequencyChanged(int)), &rServer, SLOT(onFrequencyChanged(int)));
+    QObject::connect(&fmReceiver, SIGNAL(newSongInfo(QString)), &rServer, SLOT(onSongInfo(QString)));
+    QObject::connect(&fmReceiver, SIGNAL(newRadioInfo(QString)), &rServer, SLOT(onRadioInfo(QString)));
 
     QObject::connect(&mAlarm, SIGNAL(triggered()), &fmReceiver, SLOT(startAlarm()));
 

@@ -7,7 +7,8 @@ RDSInfoThread::RDSInfoThread(ShadowRegistersHandling *handler, uint16_t *registe
     QObject(parent),
     si4703_registers(registers),
     m_handler(handler),
-    m_stop(false)
+    m_stop(false),
+    m_pauseRading(false)
 {
     Q_ASSERT(m_handler);
     qDebug() << "Create RDSInfoThread";
@@ -23,29 +24,39 @@ void RDSInfoThread::stop(bool stop)
     m_stop = stop;
 }
 
-void RDSInfoThread::setRadioStation(char *name)
+void RDSInfoThread::pauseReadingRDSInfo(bool set)
 {
-    static quint8 i = 0;
-    if (i == 5) {
-        i = 0;
-        QString string = QString::fromUtf8(name);
-        m_decodedRadioStation = string;
-        m_decodedRadioStation.clear();
-    }
-    i++;
+    m_pauseRading = set;
 }
 
-void RDSInfoThread::setSong(char *name)
+void RDSInfoThread::setRadioStation(char *name)
 {
-    static quint8 i = 0;
-    QString string = QString::fromUtf8(name);
-    if (string.length() > 0)
-        m_decodedSong.append(string);
-    if (m_decodedSong.length() > 25) {
-        qDebug() << m_decodedSong << endl;
-        m_decodedSong.clear();
-    }
+    static int i=0;
     i++;
+    if (i < 5)
+        return ;
+    i = 0;
+    QString radioInfo = QString::fromUtf8(name);
+    if (m_radioInfo == name)
+        return;
+    m_radioInfo = radioInfo;
+    emit newRadioInfo(m_radioInfo);
+    qDebug() << "Radio info = " << m_radioInfo;
+}
+
+void RDSInfoThread::setSongInfo(char *name)
+{
+    static QString lastSongInfo;
+    const QString string = QString::fromUtf8(name);
+    if (string.length() > 0)
+        m_songInfo.append(string);
+    if (m_songInfo.length() > 25) {
+        if (lastSongInfo != m_songInfo)
+            emit newSongInfo(m_songInfo);
+        qDebug() << "Song info = " << m_songInfo;
+        lastSongInfo = m_songInfo;
+        m_songInfo.clear();
+    }
 }
 
 void RDSInfoThread::process()
@@ -53,6 +64,12 @@ void RDSInfoThread::process()
     qDebug() << "\nCheck RDS";
     m_stop = false;
     while (!m_stop) {
+        if (m_pauseRading) { // if no channel is set makes no sens to read RDS
+            qDebug() << "Pause RDS info read";
+            QTest::qSleep(1000);
+            continue;
+        }
+
         m_handler->readRegisters(si4703_registers);
         if (si4703_registers[STATUSRSSI] & (1 << RDSR)) {
             const char Ch = (si4703_registers[RDSC] & 0xFF00) >> 8;
@@ -73,7 +90,7 @@ void RDSInfoThread::process()
                 const int index = 4 * si4703_registers[RDSB] & 0x000F;
                 int ix = 0;
                 if (index == 0) {
-                    setSong(decodedSong);
+                    setSongInfo(decodedSong);
                     memset(decodedSong, 0, sizeof(decodedSong));
                 }
                 decodedSong[index + ix++] = Ch;
