@@ -20,7 +20,7 @@ http://www.sparkfun.com/datasheets/BreakoutBoards/Si4703_Example.pde
 
 * Raspberry Pi to Si4703 connections I used:
 
-Rpi               Si4703
+Rpi---------------Si4703
 
 3V3-------------->3.3V
 
